@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Recruiter Dashboard — Full Version</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+const RESPONSE_OPTIONS = ["", "Interested", "Not Interested", "Call Later", "Wrong Number", "No Response"];
+
+const SAMPLE_DATA = [
+  {id:1,name:"John Doe",email:"john@example.com",contact:"123-456-7890",profession:"RN",specialty:"ICU",state:"California",city:"Los Angeles",dateOfReach:"2025-10-02",recruiter:"Vishal",lastReachedBy:"Alex",lastReachedDate:"2025-10-03",lastResponse:"Interested"},
+  {id:2,name:"Jane Smith",email:"jane@example.com",contact:"987-654-3210",profession:"LPN",specialty:"ER",state:"New York",city:"Buffalo",dateOfReach:"2025-09-28",recruiter:"Alex",lastReachedBy:"",lastReachedDate:"",lastResponse:""}
+];
+
+function useLocalStorageState(key, initial){
+  const [state,setState]=useState(()=>{try{return JSON.parse(localStorage.getItem(key))||initial}catch(e){return initial}});
+  useEffect(()=>{localStorage.setItem(key,JSON.stringify(state))},[key,state]);
+  return [state,setState];
+}
+
+function TopBar({currentRecruiter,setCurrentRecruiter,onAddCandidate,onExport,onImportClick,onCsvUpload}){
+  return <div className="topbar">
+    <div className="left">
+      <label>Current Recruiter:<input value={currentRecruiter} onChange={e=>setCurrentRecruiter(e.target.value)} placeholder="Your name" /></label>
+      <button onClick={onAddCandidate}>+ Add Candidate</button>
+      <label className="import">Upload CSV<input type="file" accept=".csv" onChange={onCsvUpload} /></label>
+    </div>
+    <div className="right">
+      <button onClick={onExport}>Export JSON</button>
+      <label className="import">Import JSON<input type="file" accept="application/json" onChange={onImportClick} /></label>
+    </div>
+  </div>;
+}
+
+function FiltersRow({filters,setFilters,columns,resetFilters}){
+  return <thead>
+    <tr className="filter-row">
+      {columns.map(col=><th key={col.key}>{col.label}<div className="filter-input">{col.type==="select"?<select value={filters[col.key]||""} onChange={e=>setFilters(prev=>({...prev,[col.key]:e.target.value}))}><option value="">--</option>{col.options?.map(opt=><option key={opt} value={opt}>{opt}</option>)}</select>:<input placeholder={col.type==="date"?"YYYY-MM-DD":"Filter..."} value={filters[col.key]||""} onChange={e=>setFilters(prev=>({...prev,[col.key]:e.target.value}))} />}</div></th>)}
+    </tr>
+    <tr><th colSpan={columns.length}><button onClick={resetFilters}>Reset Filters</button></th></tr>
+  </thead>;
+}
+
+function Table({data,setData,filters,setFilters,currentRecruiter}){
+  const columns=[
+    {key:"name",label:"Candidate Name",type:"text"},
+    {key:"email",label:"Email",type:"text"},
+    {key:"contact",label:"Contact No",type:"text"},
+    {key:"profession",label:"Profession",type:"text"},
+    {key:"specialty",label:"Specialty",type:"text"},
+    {key:"state",label:"State",type:"text"},
+    {key:"city",label:"City",type:"text"},
+    {key:"dateOfReach",label:"Date of Reach",type:"date"},
+    {key:"recruiter",label:"Owner Recruiter",type:"text"},
+    {key:"lastReachedBy",label:"Last Reached By",type:"text"},
+    {key:"lastReachedDate",label:"Last Reached Date",type:"date"},
+    {key:"lastResponse",label:"Last Response",type:"select",options:RESPONSE_OPTIONS}
+  ];
+
+  const filtered=useMemo(()=>data.filter(row=>columns.every(col=>{const f=(filters[col.key]||"").toString().toLowerCase();if(!f)return true;const val=(row[col.key]||"").toString().toLowerCase();return col.type==="date"?val.startsWith(f):val.includes(f)})),[data,filters]);
+
+  const handleCellChange=(id,field,value)=>{setData(prev=>prev.map(r=>r.id===id?{...r,[field]:value}:r))};
+  const markContacted=id=>{if(!currentRecruiter){alert("Set Current Recruiter first."); return;} const today=new Date().toISOString().split("T")[0]; setData(prev=>prev.map(r=>r.id===id?{...r,lastReachedBy:currentRecruiter,lastReachedDate:today}:r))};
+
+  return <div className="table-wrapper">
+    <table>
+      <FiltersRow filters={filters} setFilters={setFilters} columns={columns} resetFilters={()=>setFilters({})} />
+      <tbody>
+        {filtered.map(row=><tr key={row.id}>
+          {columns.map(col=>col.type==="select"?<td key={col.key}><select value={row[col.key]||""} onChange={e=>handleCellChange(row.id,col.key,e.target.value)}>{col.options.map(opt=><option key={opt} value={opt}>{opt||"--"}</option>)}</select></td>:<td key={col.key}><input type={col.type==="date"?"date":"text"} value={row[col.key]||""} onChange={e=>handleCellChange(row.id,col.key,e.target.value)} /></td>)}
+          <td className="actions">
+            <button onClick={()=>markContacted(row.id)}>Mark Contacted</button>
+            <button onClick={()=>{if(confirm("Delete candidate?")) setData(prev=>prev.filter(r=>r.id!==row.id));}}>Delete</button>
+          </td>
+        </tr>)}
+        {filtered.length===0 && <tr><td colSpan={columns.length+1} style={{textAlign:"center"}}>No rows match filters.</td></tr>}
+      </tbody>
+    </table>
+  </div>;
+}
+
+function App(){
+  const [data,setData]=useLocalStorageState("recruiter_dashboard_full_v2",SAMPLE_DATA);
+  const [filters,setFilters]=useState({});
+  const [currentRecruiter,setCurrentRecruiter]=useLocalStorageState("recruiter_dashboard_full_recruiter","Vishal");
+
+  useEffect(()=>{setData(prev=>prev.map((r,i)=>({...r,id:r.id||i+1})))},[]);
+
+  const addCandidate=()=>{const newId=data.reduce((m,r)=>Math.max(m,r.id||0),0)+1;setData(prev=>[{id:newId,name:"New Candidate",email:"",contact:"",profession:"",specialty:"",state:"",city:"",dateOfReach:new Date().toISOString().split("T")[0],recruiter:currentRecruiter||"",lastReachedBy:"",lastReachedDate:"",lastResponse:""},...prev])};
+
+  const exportJSON=()=>{const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="candidates.json"; a.click(); URL.revokeObjectURL(url)};
+  const importJSON=e=>{const file=e.target.files[0];if(!file)return; const reader=new FileReader(); reader.onload=ev=>{try{const parsed=JSON.parse(ev.target.result); if(!Array.isArray(parsed)) throw new Error("JSON must be array"); const withIds=parsed.map((p,i)=>({...p,id:p.id||i+1})); setData(withIds); alert("Imported successfully");}catch(err){alert("Import failed: "+err.message)}}; reader.readAsText(file)};
+
+  const handleCsvUpload=e=>{const file=e.target.files[0]; if(!file)return; Papa.parse(file,{header:true,skipEmptyLines:true,complete:(results)=>{const csvData=results.data.map((r,i)=>({...r,id:data.length+i+1})); setData(prev=>[...csvData,...prev]); alert("CSV uploaded successfully! Added "+csvData.length+" candidates.")}})};
+
+  return <div className="app">
+    <h1>Recruiter Dashboard</h1>
+    <p className="subtitle">Editable, filterable table with State & City + CSV Upload. Data persists in localStorage.</p>
+    <TopBar currentRecruiter={currentRecruiter} setCurrentRecruiter={setCurrentRecruiter} onAddCandidate={addCandidate} onExport={exportJSON} onImportClick={importJSON} onCsvUpload={handleCsvUpload} />
+    <Table data={data} setData={setData} filters={filters} setFilters={setFilters} currentRecruiter={currentRecruiter} />
+    <footer><small>Use column filters. "Mark Contacted" sets Last Reached By to Current Recruiter and date to today.</small></footer>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
