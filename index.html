@@ -62,6 +62,7 @@ function Table({data,setData,filters,setFilters,currentRecruiter}){
     {key:"specialty",label:"Specialty",type:"text"},
     {key:"state",label:"State",type:"text"},
     {key:"city",label:"City",type:"text"},
+    {key:"zipcode",label:"Zip Code",type:"number"},
     {key:"dateOfReach",label:"Date of Reach",type:"date"},
     {key:"recruiter",label:"Owner Recruiter",type:"text"},
     {key:"lastReachedBy",label:"Last Reached By",type:"text"},
@@ -98,7 +99,7 @@ function App(){
 
   useEffect(()=>{setData(prev=>prev.map((r,i)=>({...r,id:r.id||i+1})))},[]);
 
-  const addCandidate=()=>{const newId=data.reduce((m,r)=>Math.max(m,r.id||0),0)+1;setData(prev=>[{id:newId,name:"New Candidate",email:"",contact:"",profession:"",specialty:"",state:"",city:"",dateOfReach:new Date().toISOString().split("T")[0],recruiter:currentRecruiter||"",lastReachedBy:"",lastReachedDate:"",lastResponse:""},...prev])};
+  const addCandidate=()=>{const newId=data.reduce((m,r)=>Math.max(m,r.id||0),0)+1;setData(prev=>[{id:newId,name:"New Candidate",email:"",contact:"",profession:"",specialty:"",state:"",city:"",zipcode:"",dateOfReach:new Date().toISOString().split("T")[0],recruiter:currentRecruiter||"",lastReachedBy:"",lastReachedDate:"",lastResponse:""},...prev])};
 
   const exportJSON=()=>{const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="candidates.json"; a.click(); URL.revokeObjectURL(url)};
   const importJSON=e=>{const file=e.target.files[0];if(!file)return; const reader=new FileReader(); reader.onload=ev=>{try{const parsed=JSON.parse(ev.target.result); if(!Array.isArray(parsed)) throw new Error("JSON must be array"); const withIds=parsed.map((p,i)=>({...p,id:p.id||i+1})); setData(withIds); alert("Imported successfully");}catch(err){alert("Import failed: "+err.message)}}; reader.readAsText(file)};
